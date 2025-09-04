@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minder - 감정일기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#8B5CF6',
+                        secondary: '#F59E0B',
+                        success: '#10B981',
+                        danger: '#EF4444',
+                        warning: '#F97316',
+                        info: '#3B82F6'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase Analytics (선택) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+    
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #e9d5ff 0%, #fce7f3 100%); }
+        .glass-card { backdrop-filter: blur(16px); background: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.2); }
+        .flower-particle { position: absolute; pointer-events: none; animation: float 6s ease-in-out infinite; }
+        @keyframes float { 0%,100% { transform: translateY(0px) rotate(0deg); opacity: 0.7; } 50% { transform: translateY(-20px) rotate(180deg); opacity: 1; } }
+        .fade-up { opacity: 0; transform: translateY(30px); transition: all 0.6s ease-out; }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+        .modal-enter { animation: modalEnter 0.3s ease-out; }
+        @keyframes modalEnter { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 꽃잎 파티클 -->
+    <div id="particles" class="fixed inset-0 pointer-events-none z-0"></div>
+    
+    <!-- 랜딩 페이지 -->
+    <div id="landingPage">
+        <!-- 헤더 -->
+        <header class="sticky top-0 z-50 backdrop-blur-md bg-white/80 border-b border-purple-100">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl"></span>
+                        <span class="text-2xl font-bold text-purple-700">Minder</span>
+                    </div>
+                    <nav class="hidden md:flex items-center space-x-8">
+                        <a href="#features" class="text-gray-700 hover:text-purple-600">주요기능</a>
+                        <button onclick="openLoginModal()" class="text-gray-700 hover:text-purple-600">로그인</button>
+                        <button onclick="openLoginModal()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-2xl">회원가입</button>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="relative z-10">
+            <!-- 히어로 -->
+            <section class="gradient-bg min-h-screen flex items-center justify-center">
+                <div class="max-w-4xl mx-auto px-4 text-center">
+                    <h1 class="text-4xl md:text-6xl font-bold text-gray-800 mb-6 fade-up">
+                        오늘의 감정을 기록하고<br><span class="text-purple-600">마음을 정리해보세요</span>
+                    </h1>
+                    <p class="text-xl md:text-2xl text-gray-600 mb-12 fade-up">일기를 통해 마음을 기록하고, 감정을 탐구해보세요</p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center fade-up">
+                        <button onclick="openLoginModal()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-2xl shadow-lg hover:scale-105 transition-all">기록하기</button>
+                        <button onclick="scrollToSection('preview')" class="bg-white/20 backdrop-blur-sm text-purple-700 px-8 py-3 rounded-2xl shadow-lg hover:scale-105 transition-all">미리보기</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 미리보기 -->
+            <section id="preview" class="py-20 bg-white">
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="text-center mb-16 fade-up">
+                        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Minder 체험해보세요</h2>
+                        <p class="text-xl text-gray-600">감정 기록부터 모든 기능을 미리 만나보세요</p>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-8">
+                        <div class="glass-card rounded-3xl p-8 hover:scale-105 transition-all">
+                            <div class="text-4xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">감정 기록</h3>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-600">기분</span>
+                                    <span class="text-2xl"></span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full" style="width: 80%"></div>
+                                </div>
+                                <textarea class="w-full p-3 border border-gray-200 rounded-xl resize-none" rows="3" placeholder="오늘 어떤 기분이었나요?"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-3xl p-8 hover:scale-105 transition-all">
+                            <div class="text-4xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">캘린더</h3>
+                            <div class="grid grid-cols-7 gap-1 text-center">
+                                <div class="text-xs text-gray-500 py-1"></div><div class="text-xs text-gray-500 py-1"></div><div class="text-xs text-gray-500 py-1"></div>
+                                <div class="text-xs text-gray-500 py-1"></div><div class="text-xs text-gray-500 py-1"></div><div class="text-xs text-gray-500 py-1"></div><div class="text-xs text-gray-500 py-1"></div>
+                                <div class="p-2 text-sm">1</div><div class="p-2 text-sm">2</div><div class="p-2 text-sm bg-purple-100 rounded">3</div>
+                                <div class="p-2 text-sm bg-pink-100 rounded">4</div><div class="p-2 text-sm">5</div><div class="p-2 text-sm bg-green-100 rounded">6</div><div class="p-2 text-sm">7</div>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-3xl p-8 hover:scale-105 transition-all">
+                            <div class="text-4xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">감정 차트</h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-600">기쁨</span>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-16 bg-gray-200 rounded-full h-2">
+                                            <div class="bg-yellow-400 h-2 rounded-full" style="width: 70%"></div>
+                                        </div>
+                                        <span class="text-sm font-medium">70%</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-600">슬픔</span>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-16 bg-gray-200 rounded-full h-2">
+                                            <div class="bg-blue-400 h-2 rounded-full" style="width: 45%"></div>
+                                        </div>
+                                        <span class="text-sm font-medium">45%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 기능 -->
+            <section id="features" class="py-20 gradient-bg">
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="text-center mb-16 fade-up">
+                        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Minder의 주요 기능</h2>
+                        <p class="text-xl text-gray-600">감정 기록으로 경험을 공유하세요</p>
+                    </div>
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        <div class="text-center fade-up">
+                            <div class="text-5xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">익명 & 보안</h3>
+                            <p class="text-gray-600">개인 정보를 안전하게 보호하고, 전체적으로 개인화됩니다</p>
+                        </div>
+                        <div class="text-center fade-up">
+                            <div class="text-5xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">간편 기록</h3>
+                            <p class="text-gray-600">모먼트를 통해 빠르게 감정을 기록할 수 있습니다</p>
+                        </div>
+                        <div class="text-center fade-up">
+                            <div class="text-5xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">감정 관찰</h3>
+                            <p class="text-gray-600">차트를 통해 감정 트렌드를 파악하고 장기적으로 관리합니다</p>
+                        </div>
+                        <div class="text-center fade-up">
+                            <div class="text-5xl mb-4"></div>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-3">AI 위로</h3>
+                            <p class="text-gray-600">AI가 신뢰할 수 있는 감정을 해석하고 의미를 전달합니다</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FAQ -->
+            <section class="py-20 bg-white">
+                <div class="max-w-4xl mx-auto px-4">
+                    <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-16 text-center fade-up">자주 묻는 질문</h2>
+                    <div class="space-y-4">
+                        <div class="glass-card rounded-2xl p-6 fade-up">
+                            <button class="w-full text-left flex justify-between items-center" onclick="toggleFAQ(this)">
+                                <span class="font-semibold text-gray-800">모든 데이터는 어떻게 보호되나요?</span>
+                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div class="hidden mt-4 text-gray-600">모든 데이터는 전체적으로 암호화되어 보호됩니다.</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 fade-up">
+                            <button class="w-full text-left flex justify-between items-center" onclick="toggleFAQ(this)">
+                                <span class="font-semibold text-gray-800">라버는 어떻게 보호되나요?</span>
+                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div class="hidden mt-4 text-gray-600">암호화된 토큰을 사용하여 보호되며, 명시적으로 공유되지 않습니다.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 터 -->
+            <footer class="bg-gray-800 text-white py-12">
+                <div class="max-w-7xl mx-auto px-4 text-center">
+                    <div class="flex items-center justify-center space-x-2 mb-6">
+                        <span class="text-2xl"></span>
+                        <span class="text-2xl font-bold">Minder</span>
+                    </div>
+                    <p class="text-gray-300 mb-6">감정 기록으로 경험을 공유하세요</p>
+                    <p class="text-gray-400 text-sm">&copy; 2024 Minder. All rights reserved.</p>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- 로그인 모달 -->
+    <div id="loginModal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" onclick="closeLoginModal()"></div>
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+            <div class="glass-card rounded-3xl p-8 max-w-md w-full modal-enter">
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Minder에 오신 것을 환영합니다</h2>
+                    <p class="text-gray-600">로그인하여 감정 기록을 작성해보세요</p>
+                </div>
+                <form onsubmit="handleLogin(event)" class="space-y-6">
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-2">이메일</label>
+                        <input type="email" id="email" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400" placeholder="your@email.com">
+                    </div>
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-2">비밀번호</label>
+                        <input type="password" id="password" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400" placeholder="비밀번호">
+                    </div>
+                    <div id="errorMessage" class="hidden text-red-600 text-sm text-center"></div>
+                    <button type="submit" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-2xl w-full">로그인</button>
+                </form>
+                <button onclick="closeLoginModal()" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 기존 감정 일기 (로그인에 따라) -->
+    <div id="mainContainer" class="hidden">
+        <!-- 헤더 -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">감정 일기</h1>
+            <p class="text-gray-600">새로운 감정을 기록하고 AI가 해석해드릴게요</p>
+        </header>
+
+        <!-- 메인 컨테너 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 일기 작성 섹션 -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">오늘의 일기</h2>
+                    
+                    <!-- 날짜 선택 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">날짜</label>
+                        <input type="date" id="diaryDate" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+
+                    <!-- 감정 선택 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">오늘의 감정</label>
+                        <div class="grid grid-cols-5 gap-2">
+                            <button class="emotion-btn" data-emotion="기쁨" data-color="success">기쁨</button>
+                            <button class="emotion-btn" data-emotion="슬픔" data-color="danger">슬픔</button>
+                            <button class="emotion-btn" data-emotion="분노" data-color="warning">분노</button>
+                            <button class="emotion-btn" data-emotion="행복" data-color="info">행복</button>
+                            <button class="emotion-btn" data-emotion="평온" data-color="secondary">평온</button>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            선택된 감정: <span id="selectedEmotion">없음</span>
+                            <span id="selectedEmotionText" class="ml-2"></span>
+                        </div>
+                    </div>
+
+                    <!-- 일기 내용 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">일기 내용</label>
+                        <textarea id="diaryContent" rows="6" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="오늘 어떤 일이 있었나요?"></textarea>
+                    </div>
+
+                    <!-- 저장 버튼 -->
+                    <button id="saveDiary" class="w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-purple-600 transition-colors">일기 저장</button>
+                </div>
+            </div>
+
+            <!-- 캘린더 섹션 -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">감정 캘린더</h2>
+                    
+                    <!-- 캘린더 헤더 -->
+                    <div class="flex items-center justify-between mb-4">
+                        <button id="prevMonth" class="p-2 hover:bg-gray-100 rounded-md transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </button>
+                        <span id="currentMonth" class="text-lg font-semibold text-gray-800"></span>
+                        <button id="nextMonth" class="p-2 hover:bg-gray-100 rounded-md transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- 일별 데이터 -->
+                    <div class="grid grid-cols-7 gap-1 text-center mb-2">
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                        <div class="text-sm font-medium text-gray-600 py-2"></div>
+                    </div>
+                    
+                    <!-- 캘린더 그리드 -->
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-1">
+                        <!-- 캘린더는 JavaScript에 의해 동적으로 생성 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 일기 상세보기 -->
+        <div id="diaryDetail" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="fixed inset-0" onclick="closeDiaryDetail()"></div>
+            <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">일기 상세보기</h3>
+                    <button onclick="closeDiaryDetail()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div id="diaryDetailContent">
+                    <!-- 일기 내용이 여기에 표시됩니다 -->
+                </div>
+                <div class="mt-6 flex space-x-2">
+                    <button onclick="editDiary()" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors">수정</button>
+                    <button onclick="deleteDiary()" class="bg-danger text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors">삭제</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI 로고 메시지 -->
+        <div id="aiMessage" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="fixed inset-0" onclick="closeAiMessage()"></div>
+            <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">AI 위로 메시지</h3>
+                    <button onclick="closeAiMessage()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div id="aiMessageContent" class="text-gray-700 leading-relaxed">
+                    <!-- AI 메시지가 여기에 표시됩니다 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 알림 -->
+        <div id="notification" class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 z-50">
+            <span id="notificationText"></span>
+        </div>
+    </div>
+
+    <!-- 대시보드 -->
+    <section id="dashboard" class="hidden py-20 gradient-bg">
+        <div class="max-w-4xl mx-auto px-4">
+            <div class="text-center mb-12 fade-up">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4" id="welcomeMessage">환영합니다</h2>
+                <p class="text-xl text-gray-600">오늘의 감정을 기록해보세요</p>
+            </div>
+            
+            <div class="glass-card rounded-3xl p-8 mb-12 fade-up">
+                <h3 class="text-xl font-semibold text-gray-800 mb-6">감정 기록 기록</h3>
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">오늘의 기분</label>
+                        <div class="grid grid-cols-5 gap-3">
+                            <button class="mood-btn p-3 rounded-xl text-2xl hover:bg-purple-100 transition-colors" data-mood="기쁨">기쁨</button>
+                            <button class="mood-btn p-3 rounded-xl text-2xl hover:bg-purple-100 transition-colors" data-mood="슬픔">슬픔</button>
+                            <button class="mood-btn p-3 rounded-xl text-2xl hover:bg-purple-100 transition-colors" data-mood="분노">분노</button>
+                            <button class="mood-btn p-3 rounded-xl text-2xl hover:bg-purple-100 transition-colors" data-mood="행복">행복</button>
+                            <button class="mood-btn p-3 rounded-xl text-2xl hover:bg-purple-100 transition-colors" data-mood="평온">평온</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">감정 강도</label>
+                        <input type="range" id="moodIntensity" min="1" max="10" value="5" class="w-full h-2 bg-gray-200 rounded-lg">
+                        <div class="flex justify-between text-sm text-gray-500 mt-1">
+                            <span>약함</span>
+                            <span id="intensityValue">5</span>
+                            <span>강함</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label for="moodNote" class="block text-sm font-medium text-gray-700 mb-3">메모</label>
+                    <textarea id="moodNote" rows="4" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400 resize-none" placeholder="오늘 어떤 일이 있었나요?"></textarea>
+                </div>
+                <button onclick="saveMoodEntry()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-2xl">기록 저장</button>
+            </div>
+            
+            <div class="text-center">
+                <button onclick="logout()" class="bg-white/20 backdrop-blur-sm text-purple-700 px-8 py-3 rounded-2xl">로그아웃</button>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            // 랜딩 페이지 초기화
+            initParticles();
+            initIntersectionObserver();
+            checkLoginStatus();
+            initMoodButtons();
+            initIntensitySlider();
+            
+            // script.js는 별도로 로드됩니다
+        });
+
+        // 꽃잎 파티클
+        function initParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 12; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'flower-particle';
+                particle.innerHTML = ['', '✨', '', '', '⭐'][Math.floor(Math.random() * 5)];
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.fontSize = (Math.random() * 15 + 12) + 'px';
+                particle.style.animationDelay = Math.random() * 6000 + 'ms';
+                container.appendChild(particle);
+            }
+        }
+
+        // 
+        function initIntersectionObserver() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) entry.target.classList.add('visible');
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+        }
+
+        // 스크롤
+        function scrollToSection(sectionId) {
+            document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // FAQ 토글
+        function toggleFAQ(button) {
+            const content = button.nextElementSibling;
+            const icon = button.querySelector('svg');
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // 모달
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.remove('hidden');
+            document.getElementById('email').focus();
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        // 로그인
+        function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showError('이메일과 비밀번호를 모두 입력해주세요.');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError('비밀번호는 최소 6자 이상이어야 합니다.');
+                return;
+            }
+            
+            // Firebase 인증 사용
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    console.log('로그인 성공:', userCredential.user.email);
+                    closeLoginModal();
+                    showMainApp();
+                })
+                .catch((error) => {
+                    console.error('로그인 실패:', error);
+                    showError('로그인에 실패했습니다: ' + error.message);
+                });
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        // 상태 확인
+        function checkLoginStatus() {
+            // 자동 로그인 비활성화 - 사용자가 직접 로그인해야 함
+            console.log('자동 로그인 비활성화');
+        }
+
+        function showMainApp() {
+            document.getElementById('landingPage').classList.add('hidden');
+            document.getElementById('mainContainer').classList.remove('hidden');
+            
+            // 로그인 후 초기화
+            setTimeout(() => {
+                try {
+                    // 현재 로그인된 사용자의 일기 데이터 불러오기
+                    const currentUser = firebase.auth().currentUser;
+                    if (currentUser && typeof loadUserDiaries === 'function') {
+                        console.log('사용자의 일기 데이터 불러오기:', currentUser.uid);
+                        loadUserDiaries(currentUser.uid);
+                    }
+                    
+                    if (typeof initializeApp === 'function') {
+                        console.log('로그인 후 initializeApp 호출');
+                        initializeApp();
+                    }
+                    if (typeof setupEventListeners === 'function') {
+                        console.log('로그인 후 setupEventListeners 호출');
+                        setupEventListeners();
+                    }
+                    if (typeof renderCalendar === 'function') {
+                        console.log('로그인 후 renderCalendar 호출');
+                        renderCalendar();
+                    }
+                    if (typeof updateCurrentMonthDisplay === 'function') {
+                        console.log('로그인 후 updateCurrentMonthDisplay 호출');
+                        updateCurrentMonthDisplay();
+                    }
+                } catch (error) {
+                    console.error('앱 초기화 오류:', error);
+                }
+            }, 200);
+        }
+
+        function showLanding() {
+            document.getElementById('mainContainer').classList.add('hidden');
+            document.getElementById('landingPage').classList.remove('hidden');
+        }
+
+        // 감정 버튼
+        function initMoodButtons() {
+            document.querySelectorAll('.mood-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('bg-purple-200'));
+                    this.classList.add('bg-purple-200');
+                });
+            });
+        }
+
+        // 강도 슬라이더
+        function initIntensitySlider() {
+            const slider = document.getElementById('moodIntensity');
+            const value = document.getElementById('intensityValue');
+            slider.addEventListener('input', function() {
+                value.textContent = this.value;
+            });
+        }
+
+        // 감정 저장
+        function saveMoodEntry() {
+            const note = document.getElementById('moodNote').value;
+            if (!note.trim()) {
+                alert('메모를 입력해주세요.');
+                return;
+            }
+            
+            const selectedMood = document.querySelector('.mood-btn.bg-purple-200')?.dataset.mood || '';
+            const intensity = document.getElementById('moodIntensity').value;
+            
+            const entry = {
+                date: new Date().toISOString().split('T')[0],
+                mood: selectedMood,
+                intensity: parseInt(intensity),
+                note: note
+            };
+            
+            let entries = JSON.parse(localStorage.getItem('minder_demo_entries') || '[]');
+            entries.push(entry);
+            localStorage.setItem('minder_demo_entries', JSON.stringify(entries));
+            
+            document.getElementById('moodNote').value = '';
+            document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('bg-purple-200'));
+            document.getElementById('moodIntensity').value = 5;
+            document.getElementById('intensityValue').textContent = '5';
+            
+            alert('감정이 기록되었습니다!');
+        }
+
+        // 로그아웃
+        function logout() {
+            localStorage.removeItem('minder_demo_user');
+            localStorage.removeItem('minder_demo_entries');
+            showLanding();
+        }
+
+        // ESC 키
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') closeLoginModal();
+        });
+    </script>
+
+    <!-- 기존 기능 동일한 스크립트 -->
+    <script src="config.js"></script>
+    <script>
+        // Firebase 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            // config.js가 로드되면 Firebase 초기화
+            if (typeof firebaseConfig !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                console.log('Firebase 초기화 완료');
+                
+                // script.js 로드
+                const script = document.createElement('script');
+                script.src = 'script.js';
+                script.onload = function() {
+                    console.log('script.js 로드 완료');
+                    
+                    // script.js 로드 후 동적 초기화
+                    // 로그인 상태 초기화는 여기서 이루어짐
+                    
+                    // 기존 랜딩 페이지 초기화
+                    if (typeof initIntersectionObserver === 'function') {
+                        initIntersectionObserver();
+                    }
+                    if (typeof initParticles === 'function') {
+                        initParticles();
+                    }
+                    if (typeof checkLoginStatus === 'function') {
+                        checkLoginStatus();
+                    }
+                };
+                document.head.appendChild(script);
+            } else {
+                console.error('firebaseConfig를 찾을 수 없습니다.');
+            }
+        });
+    </script>
+</body>
+</html> 
