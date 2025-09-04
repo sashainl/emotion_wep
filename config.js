@@ -4,7 +4,7 @@ const LLM_CONFIG = {
     GEMINI: {
         enabled: true,
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-        apiKey: 'AIzaSyD9NIkW4vvFZSJlKHGO97MRu4GdHmsnZzA', // .env에서 가져온 Gemini API 키
+        apiKey: process.env.GEMINI, // .env에서 가져온 Gemini API 키
         model: 'gemini-1.5-flash'
     }
 };
